@@ -40,14 +40,14 @@
     </div>
 
     <script>
-        // --- ใส่ค่า Config จาก Firebase ของคุณที่นี่ ---
+        // 1. Firebase Configuration
         const firebaseConfig = {
            databaseURL: "https://scorebad-4a88f-default-rtdb.firebaseio.com/"
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // โหลดข้อมูลแบบ Real-time (ใครแก้ ข้อมูลเปลี่ยนทันที)
+        // 2. Real-time Listener: อัปเดต UI ทันทีเมื่อข้อมูลใน Cloud เปลี่ยนแปลง
         db.ref('scores').on('value', (snapshot) => {
             const data = snapshot.val() || {};
             const board = document.getElementById('board');
@@ -57,14 +57,19 @@
             Object.keys(data).forEach(id => {
                 const user = data[id];
                 total += user.score;
-                const logs = user.logs ? Object.values(user.logs).slice(0, 3).map(l => `[${l.time}] ${l.voter}: ${l.change > 0 ? '+' : ''}${l.change}`).join(' | ') : 'READY';
                 
+                // จัดการดึง Log ล่าสุดมาแสดงผล
+                const logsArr = user.logs ? Object.values(user.logs) : [];
+                const latestLogs = logsArr.reverse().slice(0, 3).map(l => 
+                    `[${l.time}] ${l.voter}: ${l.change > 0 ? '+' : ''}${l.change}`
+                ).join(' | ');
+
                 board.innerHTML += `
                     <div class="user-card">
                         <div>
                             <div style="font-size: 1.2em; font-weight: bold; color: var(--accent);">${user.name}</div>
                             <div style="font-size: 0.8em; color: #8b949e;">${user.note}</div>
-                            <div class="history">LOGS: ${logs}</div>
+                            <div class="history">LOGS: ${latestLogs || 'READY'}</div>
                         </div>
                         <div style="text-align: right; display: flex; flex-direction: column; justify-content: center; align-items: flex-end;">
                             <div style="font-size: 2.2em;">${user.score}</div>
@@ -79,22 +84,36 @@
             document.getElementById('totalScore').innerText = total;
         });
 
+        // 3. ฟังก์ชันเพิ่มรายชื่อใหม่
         function addUser() {
             const name = document.getElementById('regName').value.trim();
             const note = document.getElementById('regNote').value.trim();
             if (!name) return;
-            db.ref('scores').push({ name, note: note || 'N/A', score: 0 });
+            db.ref('scores').push({ 
+                name: name, 
+                note: note || 'N/A', 
+                score: 0 
+            });
             document.getElementById('regName').value = '';
             document.getElementById('regNote').value = '';
         }
 
+        // 4. ฟังก์ชันอัปเดตคะแนนและบันทึก Log
         function updateScore(id, currentScore, change) {
             const voter = document.getElementById(`v-${id}`).value.trim();
             if (!voter) return alert('ใส่ชื่อผู้โหวต!');
             
             const time = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+            
+            // อัปเดตคะแนนหลัก
             db.ref(`scores/${id}`).update({ score: currentScore + change });
-            db.ref(`scores/${id}/logs`).push({ voter, change, time });
+            
+            // เพิ่ม Log ประวัติ
+            db.ref(`scores/${id}/logs`).push({ 
+                voter: voter, 
+                change: change, 
+                time: time 
+            });
         }
     </script>
 </body>
