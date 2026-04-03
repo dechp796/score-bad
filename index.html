@@ -74,7 +74,7 @@
                         <div style="text-align: right; display: flex; flex-direction: column; justify-content: center; align-items: flex-end;">
                             <div style="font-size: 2.2em;">${user.score}</div>
                             <div>
-                                <input type="text" id="v-${id}" class="voter-input" placeholder="VOTER_ID">
+                                <input type="text" id="v-${id}" class="voter-input" placeholder="ชื่อผู้โหวตคะแนน">
                                 <button onclick="updateScore('${id}', ${user.score}, 1)" style="color:var(--success)">+</button>
                                 <button onclick="updateScore('${id}', ${user.score}, -1)" style="color:var(--danger)">-</button>
                             </div>
