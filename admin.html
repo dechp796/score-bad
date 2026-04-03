@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Console</title>
+    <style>
+        body { font-family: 'Consolas', monospace; background: #000; color: #3fb950; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .admin-panel { border: 1px solid #3fb950; padding: 20px; width: 100%; max-width: 600px; background: #0d1117; }
+        input, button { background: #000; border: 1px solid #3fb950; color: #3fb950; padding: 8px; margin: 5px; font-family: inherit; }
+        button:hover { background: #3fb950; color: #000; cursor: pointer; }
+        .row { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #222; padding: 10px; }
+        .btn-del { border-color: red; color: red; font-size: 0.7em; }
+        #authOverlay { position: fixed; top:0; left:0; width:100%; height:100%; background:#000; display:flex; justify-content:center; align-items:center; z-index:99; }
+    </style>
+</head>
+<body>
+    <div id="authOverlay">
+        <div style="text-align:center; border: 1px solid #3fb950; padding: 30px;">
+            <h3>ADMIN_LOGIN</h3>
+            <input type="password" id="passInput" placeholder="KEY">
+            <button onclick="checkAuth()">ENTER</button>
+        </div>
+    </div>
+
+    <div class="admin-panel">
+        <h1>[ ADMIN_DATABASE_CONTROL ]</h1>
+        <div id="adminBoard"></div>
+        <hr style="border-color:#3fb950; margin: 20px 0;">
+        <button onclick="wipe()" style="color:red; border-color:red; width:100%;">!!! WIPE_ALL_DATA !!!</button>
+    </div>
+
+    <script>
+        const DB_KEY = 'sinSystemV8';
+        const HASH = "240be518ebb702465118d18a3196941b5678b873e726dfa105825482390a330a"; // admin123
+
+        async function checkAuth() {
+            const val = document.getElementById('passInput').value;
+            const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(val));
+            const hex = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+            if(hex === HASH) { document.getElementById('authOverlay').style.display='none'; render(); }
+            else { alert('WRONG KEY'); }
+        }
+
+        function render() {
+            const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
+            const container = document.getElementById('adminBoard');
+            container.innerHTML = '';
+            db.forEach((u, i) => {
+                container.innerHTML += `
+                    <div class="row">
+                        <span><strong>${u.name}</strong> (Score: ${u.score})</span>
+                        <button class="btn-del" onclick="del(${i})">DELETE_ENTITY</button>
+                    </div>`;
+            });
+        }
+
+        function del(i) {
+            if(confirm('ยืนยันการลบ?')) {
+                let db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
+                db.splice(i, 1);
+                localStorage.setItem(DB_KEY, JSON.stringify(db));
+                render();
+            }
+        }
+
+        function wipe() {
+            if(confirm('ล้างข้อมูลทั้งหมด?')) {
+                localStorage.removeItem(DB_KEY);
+                render();
+            }
+        }
+        window.addEventListener('storage', render);
+    </script>
+</body>
+</html>
