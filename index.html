@@ -2,18 +2,19 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>Score บาป - User Dashboard</title>
+    <title>Score บาป - Realtime Dashboard</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
         :root { --bg: #0d1117; --card: #161b22; --text: #c9d1d9; --accent: #58a6ff; --danger: #f85149; --success: #3fb950; --border: #30363d; }
         body { font-family: 'Consolas', monospace; background: var(--bg); color: var(--text); padding: 20px; display: flex; flex-direction: column; align-items: center; }
         .container { width: 100%; max-width: 700px; }
+        .header { text-align: center; border: 1px solid var(--border); padding: 20px; margin-bottom: 20px; border-radius: 8px; background: var(--card); }
+        #totalScore { font-size: 3em; color: var(--danger); font-weight: bold; }
         .panel { background: var(--card); padding: 15px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 20px; }
-        .header { text-align: center; border: 1px solid var(--border); padding: 15px; margin-bottom: 20px; border-radius: 8px; background: var(--card); }
-        #totalScore { font-size: 2.5em; color: var(--danger); font-weight: bold; }
         input, button { background: #0d1117; border: 1px solid var(--border); color: white; padding: 8px; border-radius: 4px; margin: 5px 2px; font-family: inherit; }
-        button { cursor: pointer; font-weight: bold; }
+        button { cursor: pointer; font-weight: bold; transition: 0.2s; }
         button:hover { background: #21262d; }
-        .btn-push { background: var(--accent); color: #000; width: 100%; border: none; }
         .user-card { background: var(--card); border: 1px solid var(--border); padding: 15px; margin-bottom: 10px; border-radius: 6px; display: grid; grid-template-columns: 1fr auto; gap: 15px; }
         .voter-input { width: 90px; border-color: var(--accent); font-size: 0.8em; }
         .history { font-size: 0.7em; color: #8b949e; margin-top: 10px; border-top: 1px solid var(--border); padding-top: 5px; }
@@ -22,8 +23,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1 style="color:var(--accent); margin:0;">[ SCORE_MONITOR_V8 ]</h1>
-            <div>TOTAL GUILT: <span id="totalScore">0</span></div>
+            <h1 style="color:var(--accent); margin:0;">[ REALTIME_SCORE_V9 ]</h1>
+            <div>TOTAL SYSTEM GUILT: <span id="totalScore">0</span></div>
         </div>
 
         <div class="panel">
@@ -32,70 +33,69 @@
                 <input type="text" id="regName" placeholder="NAME" style="flex: 1;">
                 <input type="text" id="regNote" placeholder="REMARK" style="flex: 2;">
             </div>
-            <button class="btn-push" onclick="addUser()">PUSH TO DATABASE</button>
+            <button onclick="addUser()" style="width:100%; background:var(--accent); color:#000; border:none;">PUSH TO CLOUD</button>
         </div>
 
         <div id="board"></div>
     </div>
 
     <script>
-        const DB_KEY = 'sinSystemV8';
+        // --- ใส่ค่า Config จาก Firebase ของคุณที่นี่ ---
+        const firebaseConfig = {
+            databaseURL: "https://scorebad-4a88f-default-rtdb.firebaseio.com/"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
 
-        function render() {
-            const db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
+        // โหลดข้อมูลแบบ Real-time (ใครแก้ ข้อมูลเปลี่ยนทันที)
+        db.ref('scores').on('value', (snapshot) => {
+            const data = snapshot.val() || {};
             const board = document.getElementById('board');
             let total = 0;
             board.innerHTML = '';
-            
-            db.forEach((user, idx) => {
+
+            Object.keys(data).forEach(id => {
+                const user = data[id];
                 total += user.score;
-                const logs = user.logs.map(l => `[${l.time}] ${l.voter}: ${l.change > 0 ? '+' : ''}${l.change}`).join(' | ');
+                const logs = user.logs ? Object.values(user.logs).slice(0, 3).map(l => `[${l.time}] ${l.voter}: ${l.change > 0 ? '+' : ''}${l.change}`).join(' | ') : 'READY';
+                
                 board.innerHTML += `
                     <div class="user-card">
                         <div>
                             <div style="font-size: 1.2em; font-weight: bold; color: var(--accent);">${user.name}</div>
                             <div style="font-size: 0.8em; color: #8b949e;">${user.note}</div>
-                            <div class="history">LOGS: ${logs || 'READY'}</div>
+                            <div class="history">LOGS: ${logs}</div>
                         </div>
                         <div style="text-align: right; display: flex; flex-direction: column; justify-content: center; align-items: flex-end;">
                             <div style="font-size: 2.2em;">${user.score}</div>
                             <div>
-                                <input type="text" id="v-${idx}" class="voter-input" placeholder="VOTER_ID">
-                                <button onclick="updateScore(${idx}, 1)" style="color:var(--success)">+</button>
-                                <button onclick="updateScore(${idx}, -1)" style="color:var(--danger)">-</button>
+                                <input type="text" id="v-${id}" class="voter-input" placeholder="VOTER_ID">
+                                <button onclick="updateScore('${id}', ${user.score}, 1)" style="color:var(--success)">+</button>
+                                <button onclick="updateScore('${id}', ${user.score}, -1)" style="color:var(--danger)">-</button>
                             </div>
                         </div>
                     </div>`;
             });
             document.getElementById('totalScore').innerText = total;
-        }
+        });
 
         function addUser() {
             const name = document.getElementById('regName').value.trim();
             const note = document.getElementById('regNote').value.trim();
             if (!name) return;
-            let db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
-            if (db.some(u => u.name.toLowerCase() === name.toLowerCase())) return alert('ชื่อนี้มีอยู่แล้ว!');
-            db.push({ name, note: note || 'N/A', score: 0, logs: [] });
-            localStorage.setItem(DB_KEY, JSON.stringify(db));
+            db.ref('scores').push({ name, note: note || 'N/A', score: 0 });
             document.getElementById('regName').value = '';
             document.getElementById('regNote').value = '';
-            render();
         }
 
-        function updateScore(idx, change) {
-            const vInput = document.getElementById(`v-${idx}`);
-            if (!vInput.value.trim()) return alert('ใส่ชื่อคนโหวตด้วย!');
-            let db = JSON.parse(localStorage.getItem(DB_KEY)) || [];
-            db[idx].score += change;
-            db[idx].logs.unshift({ voter: vInput.value.trim(), change, time: new Date().toLocaleTimeString().slice(0,5) });
-            if (db[idx].logs.length > 3) db[idx].logs.pop();
-            localStorage.setItem(DB_KEY, JSON.stringify(db));
-            render();
+        function updateScore(id, currentScore, change) {
+            const voter = document.getElementById(`v-${id}`).value.trim();
+            if (!voter) return alert('ใส่ชื่อผู้โหวต!');
+            
+            const time = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+            db.ref(`scores/${id}`).update({ score: currentScore + change });
+            db.ref(`scores/${id}/logs`).push({ voter, change, time });
         }
-
-        window.addEventListener('storage', render);
-        render();
     </script>
 </body>
 </html>
